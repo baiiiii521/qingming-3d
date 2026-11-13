@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>清明上河图 · 画中行（3D）</title>
+<meta name="description" content="真正走进《清明上河图》：第三人称骑马，穿行于 3D 建模的汴河、虹桥、街市与城门之间。" />
+<style>
+  :root{ --gold:#c9a227; --gold2:#e8c766; --paper:#e9dcc0; --red:#a33327; }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{ height:100%; overflow:hidden; background:#171208; }
+  body{ font-family:"Songti SC","STSong","Noto Serif SC","SimSun",serif; color:var(--paper); }
+  canvas#gl{ position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  .hidden{ display:none !important; }
+
+  #gallery{ position:fixed; inset:0; z-index:20; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:radial-gradient(120% 90% at 50% 30%, #2e2417 0%, #1d150c 55%, #100b06 100%); }
+  #gallery .scrollbox{ width:min(1180px,94vw); }
+  #gallery .frame{ border:10px solid #4a3520; outline:2px solid #221809; box-shadow:0 30px 80px rgba(0,0,0,.65), inset 0 0 0 2px #6b5232;
+    background:#0d0a06; padding:6px; }
+  #gallery .frame img{ display:block; width:100%; height:auto; }
+  #gallery .rollers{ display:flex; justify-content:space-between; margin-top:6px; color:#8a6f45; font-size:12px; letter-spacing:.5em; }
+  #plaque{ text-align:center; margin-top:26px; }
+  #plaque h1{ font-size:clamp(26px,4.4vw,44px); letter-spacing:.14em; font-weight:700; }
+  #plaque h1 .thin{ color:var(--gold2); }
+  #plaque .sub{ margin-top:8px; color:#b49b6d; letter-spacing:.28em; font-size:13px; }
+  #plaque .btns{ margin-top:22px; display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+  button{ font-family:inherit; cursor:pointer; }
+  #enter{ background:linear-gradient(180deg,var(--gold2),var(--gold)); color:#241a08; border:1px solid #8a6f1f; border-radius:999px;
+    padding:12px 34px; font-size:17px; letter-spacing:.3em; font-weight:700; box-shadow:0 6px 24px rgba(201,162,39,.35); }
+  #open-board{ background:none; border:none; color:#cdb27a; font-size:15px; letter-spacing:.3em; text-decoration:underline; text-underline-offset:5px; }
+  #gallery .note{ margin-top:18px; color:#776444; font-size:12px; letter-spacing:.18em; }
+  #handle{ position:absolute; right:18px; bottom:14px; color:#6d5836; font-size:12px; letter-spacing:.2em; }
+
+  #hud{ position:fixed; inset:0; z-index:10; pointer-events:none; }
+  .chip{ background:rgba(24,17,9,.72); border:1px solid rgba(201,162,39,.45); border-radius:10px; padding:7px 12px;
+    backdrop-filter:blur(3px); color:var(--paper); font-size:15px; letter-spacing:.08em; white-space:nowrap; }
+  .chip b{ color:var(--gold2); font-size:18px; }
+  #hud-tl{ position:absolute; top:14px; left:14px; display:flex; gap:8px; flex-wrap:wrap; }
+  #mult{ color:#ffb35c; font-weight:700; }
+  #guide{ position:absolute; top:14px; left:50%; transform:translateX(-50%); }
+  #guide .chip{ color:var(--gold2); }
+  #guide-arrow{ display:inline-block; transition:transform .12s linear; }
+  #hud-tr{ position:absolute; top:14px; right:14px; display:flex; gap:8px; align-items:flex-start; }
+  .rbtn{ pointer-events:auto; width:40px; height:40px; border-radius:50%; border:1px solid rgba(201,162,39,.5);
+    background:rgba(24,17,9,.72); color:var(--gold2); font-size:17px; }
+  #finish-btn{ pointer-events:auto; border:1px solid rgba(201,162,39,.6); background:rgba(163,51,39,.85); color:#ffe9c9;
+    border-radius:999px; padding:10px 18px; letter-spacing:.25em; font-size:14px; font-weight:700; }
+  #brief{ position:absolute; top:21%; left:50%; transform:translateX(-50%); text-align:center; color:#fff3d6; width:94vw;
+    text-shadow:0 2px 14px rgba(0,0,0,.75); font-size:clamp(16px,2.4vw,24px); letter-spacing:.22em; line-height:1.9; transition:opacity 1.2s; }
+  #brief small{ font-size:.62em; color:#e3cf9e; letter-spacing:.3em; }
+  #zone{ position:absolute; bottom:120px; left:16px; color:rgba(60,40,14,.85); font-size:14px; letter-spacing:.3em; font-weight:600; }
+  #strip{ position:absolute; left:50%; transform:translateX(-50%); bottom:12px; width:min(860px,92vw); height:34px;
+    border:1px solid rgba(201,162,39,.55); border-radius:6px; overflow:hidden; background:#0d0a06; }
+  #strip img{ width:100%; height:100%; object-fit:fill; display:block; opacity:.92; }
+  #strip .mark{ position:absolute; top:0; bottom:0; width:2px; background:rgba(255,240,200,.35); }
+  #strip .mark span{ position:absolute; top:1px; left:3px; font-size:9px; color:#ffeec2; letter-spacing:.1em; text-shadow:0 1px 3px #000; white-space:nowrap; }
+  #strip-you{ position:absolute; top:0; width:14px; height:14px; margin-left:-7px; }
+  #strip-you i{ display:block; width:10px; height:10px; margin:2px; border-radius:50%; background:var(--red); border:2px solid #ffe9c9; box-shadow:0 0 8px rgba(0,0,0,.6); }
+  #keys{ position:absolute; bottom:54px; left:50%; transform:translateX(-50%); color:rgba(46,32,12,.75);
+    font-size:12.5px; letter-spacing:.22em; white-space:nowrap; font-weight:600; }
+  #pad{ position:absolute; inset:auto 0 58px 0; display:none; justify-content:space-between; padding:0 16px; }
+  #pad .side{ display:flex; gap:12px; }
+  #pad button{ pointer-events:auto; width:60px; height:60px; border-radius:50%; border:1px solid rgba(201,162,39,.6);
+    background:rgba(24,17,9,.55); color:#ffe9c9; font-size:19px; }
+  body.touch #pad{ display:flex; }
+  body.touch #keys{ display:none; }
+
+  .panel{ position:fixed; inset:0; z-index:30; display:flex; align-items:center; justify-content:center; background:rgba(10,7,3,.62); }
+  .card{ width:min(520px,92vw); max-height:88vh; overflow:auto; background:linear-gradient(180deg,#241a10,#1a120a); border:1px solid rgba(201,162,39,.55);
+    border-radius:14px; padding:26px 28px; box-shadow:0 30px 80px rgba(0,0,0,.6); text-align:center; }
+  .card h2{ letter-spacing:.3em; color:var(--gold2); font-size:22px; margin-bottom:6px; }
+  .card .score{ font-size:17px; margin:10px 0 2px; }
+  .card .score strong{ color:var(--gold2); font-size:30px; }
+  .card .stats{ color:#c9b183; font-size:13.5px; letter-spacing:.12em; margin-bottom:14px; }
+  .card form{ display:flex; gap:8px; justify-content:center; margin:12px 0 4px; }
+  .card input{ background:#0f0a05; border:1px solid rgba(201,162,39,.5); border-radius:8px; color:var(--paper);
+    padding:10px 12px; font-family:inherit; font-size:15px; width:180px; }
+  .card form button, .card .row button{ background:linear-gradient(180deg,var(--gold2),var(--gold)); color:#241a08; border:1px solid #8a6f1f;
+    border-radius:999px; padding:10px 20px; letter-spacing:.2em; font-weight:700; font-size:14px; }
+  .card .row{ display:flex; gap:10px; justify-content:center; margin-top:16px; }
+  .card .row button.ghost{ background:none; color:#cdb27a; border-color:rgba(201,162,39,.4); }
+  .card ol{ text-align:left; margin:12px auto 0; max-width:400px; list-style:none; counter-reset:rk; }
+  .card ol li{ counter-increment:rk; display:flex; justify-content:space-between; gap:10px; padding:6px 8px; border-bottom:1px dashed rgba(201,162,39,.25); font-size:15px; }
+  .card ol li::before{ content:counter(rk); color:var(--gold); width:22px; }
+  .card ol li b{ color:var(--gold2); }
+  .card .empty{ color:#a68d5c; margin-top:10px; letter-spacing:.15em; font-size:14px; }
+  #board-msg{ color:#ffb35c; min-height:20px; font-size:13.5px; letter-spacing:.1em; }
+
+  #loading{ position:fixed; inset:0; z-index:40; background:#171208; display:flex; flex-direction:column; gap:16px;
+    align-items:center; justify-content:center; color:#cdb27a; letter-spacing:.4em; font-size:15px; }
+  #loading .pulse{ width:44px; height:44px; border-radius:50%; border:2px solid rgba(201,162,39,.25); border-top-color:var(--gold2);
+    animation:sp 1s linear infinite; }
+  @keyframes sp{ to{ transform:rotate(360deg); } }
+  @media (max-width:760px){
+    .chip{ font-size:12.5px; padding:5px 8px; } .chip b{ font-size:15px; }
+    #hud-tl{ max-width:47vw; gap:5px; } #hud-tr{ gap:5px; } #hud-tr .chip{ display:none; }
+    #finish-btn{ padding:8px 12px; font-size:12.5px; } .rbtn{ width:34px; height:34px; font-size:14px; }
+    #guide{ top:58px; } #keys{ display:none; } #pad{ display:flex; } #brief{ top:24%; }
+    #strip{ bottom:132px; } #zone{ bottom:182px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div id="gallery" class="hidden">
+  <div class="scrollbox">
+    <div class="frame"><img src="assets/gallery.jpg" alt="清明上河图" /></div>
+    <div class="rollers"><span>◉ 卷末 · 城门</span><span>卷首 · 郊野 ◉</span></div>
+  </div>
+  <div id="plaque">
+    <h1>清明上河图 <span class="thin">· 画中行</span></h1>
+    <p class="sub">北宋 · 张择端 &nbsp;|&nbsp; 这一次，真的走进画里</p>
+    <div class="btns">
+      <button id="enter" type="button">走 进 画 卷</button>
+      <button id="open-board" type="button">本地排行榜</button>
+    </div>
+    <p class="note" style="margin-top:18px;color:#776444;font-size:12px;letter-spacing:.18em;">单人版 · 3D 建模的汴河、虹桥与东京城 · 拾铜钱、送城门 · 分数只存在这台设备上</p>
+  </div>
+  <span id="handle">Riverside Ride 3D</span>
+</div>
+
+<div id="hud" class="hidden">
+  <div id="hud-tl">
+    <span class="chip">铜钱 <b id="coin-count">0</b> 枚</span>
+    <span class="chip">待送 <b id="carry-points">0</b> 分</span>
+    <span class="chip">已送达 <b id="bank-count">0</b></span>
+    <span class="chip hidden" id="mult-chip">连拾 <span id="mult">×1.0</span></span>
+  </div>
+  <div id="guide"><span class="chip"><span id="guide-arrow">↑</span> 城门 · <span id="guide-dist">—</span></span></div>
+  <div id="hud-tr">
+    <span class="chip">总分 <b id="score">0</b></span>
+    <button id="finish-btn" type="button">收官</button>
+    <button class="rbtn" id="btn-sound" type="button" title="声音 (M)">♪</button>
+    <button class="rbtn" id="btn-gallery" type="button" title="回画廊 (Esc)">▢</button>
+  </div>
+  <div id="brief">
+    <p>你已身在画中——策马沿汴河东行<br />拾起铜钱，跃上虹桥，送进东京城门。</p>
+    <small>W 催马 · A/D 转向 · 空格 跃马 · 拖动可环视</small>
+  </div>
+  <div id="zone">· 郊野 ·</div>
+  <div id="keys">W 催马 &nbsp;·&nbsp; S 勒马 &nbsp;·&nbsp; A/D 转向 &nbsp;·&nbsp; 空格 跃马 &nbsp;·&nbsp; 拖动环视 &nbsp;·&nbsp; M 声音 &nbsp;·&nbsp; Esc 回画廊</div>
+  <div id="strip">
+    <img src="assets/backdrop.webp" alt="" />
+    <div class="mark" style="left:27.3%"><span>虹桥</span></div>
+    <div class="mark" style="left:76.4%"><span>城门</span></div>
+    <div id="strip-you"><i></i></div>
+  </div>
+  <div id="pad">
+    <div class="side">
+      <button id="pad-left" type="button">←</button>
+      <button id="pad-right" type="button">→</button>
+    </div>
+    <div class="side">
+      <button id="pad-fwd" type="button">马</button>
+      <button id="pad-jump" type="button">跃</button>
+    </div>
+  </div>
+</div>
+
+<div id="finish" class="panel hidden">
+  <div class="card">
+    <h2>收 官</h2>
+    <p class="score">本局总分 <strong id="fin-score">0</strong></p>
+    <p class="stats" id="fin-stats"></p>
+    <form id="fin-form" autocomplete="off">
+      <input id="fin-name" maxlength="10" placeholder="留下你的名字" />
+      <button type="submit">记入本地榜</button>
+    </form>
+    <p id="board-msg"></p>
+    <div class="row">
+      <button id="fin-again" type="button">再骑一局</button>
+      <button id="fin-back" type="button" class="ghost">回画廊</button>
+    </div>
+  </div>
+</div>
+
+<div id="board" class="panel hidden">
+  <div class="card">
+    <h2>本地排行榜</h2>
+    <p class="stats">与 2D 版共用同一张榜 · 分数只保存在这台设备的浏览器里</p>
+    <ol id="board-list"></ol>
+    <p class="empty" id="board-empty">尚无记录——先进画卷骑一局。</p>
+    <div class="row"><button id="board-close" type="button" class="ghost">关闭</button></div>
+  </div>
+</div>
+
+<div id="loading"><div class="pulse"></div><span>研墨中…</span></div>
+
+<script src="assets/three.min.js"></script>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v, lerp=(a,b,t)=>a+(b-a)*t;
+if (matchMedia('(pointer:coarse)').matches) document.body.classList.add('touch');
+
+/* ================= world layout ================= */
+const START_X=-560, GATE_X=330, END_X=545;
+const RIVER={x0:-245, x1:-75, peak:12.5};
+const journey = x => (x-START_X)/(END_X-START_X);
+function deckH(x){ if(x<RIVER.x0||x>RIVER.x1) return 0;
+  const t=(x-RIVER.x0)/(RIVER.x1-RIVER.x0); return RIVER.peak*Math.pow(Math.sin(Math.PI*t),0.85); }
+function groundH(x,z){ // rider's floor
+  if (Math.abs(z)<8.6 && x>RIVER.x0-6 && x<RIVER.x1+6) return deckH(clamp(x,RIVER.x0,RIVER.x1));
+  return 0; }
+
+/* ================= three setup ================= */
+const renderer=new THREE.WebGLRenderer({canvas:$('gl'), antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.75));
+renderer.setSize(innerWidth,innerHeight);
+renderer.outputEncoding=THREE.sRGBEncoding;
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0xe9d6a4);
+scene.fog=new THREE.Fog(0xe3cd9a, 150, 980);
+const camera=new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 2400);
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight); });
+scene.add(new THREE.HemisphereLight(0xfff0c8, 0x8a6f4d, 1.0));
+const sun=new THREE.DirectionalLight(0xffdf9e, 1.15); sun.position.set(120,190,80); scene.add(sun);
+const fill=new THREE.DirectionalLight(0xffe9c0, 0.3); fill.position.set(-90,60,-120); scene.add(fill);
+
+/* plain Image loading: THREE's loader sets crossOrigin='anonymous', which file:// rejects outright */
+function loadTex(url, rx=1, ry=1, mirror=true){ const img=new Image();
+  const t=new THREE.Texture(img);
+  if (mirror) t.wrapS=t.wrapT=THREE.MirroredRepeatWrapping;
+  t.repeat.set(rx,ry); t.colorSpace=THREE.SRGBColorSpace;
+  img.onload=()=>{ t.needsUpdate=true; }; img.src=url; return t; }
+function tex(name, rx=1, ry=1){ return loadTex('assets/tex/'+name+'.jpg', rx, ry); }
+const MAT={
+  ground: new THREE.MeshLambertMaterial({map:tex('ground',52,30)}),
+  field:  new THREE.MeshLambertMaterial({map:tex('field',10,7)}),
+  road:   new THREE.MeshLambertMaterial({map:tex('ground',60,2), color:0xe8dcc0}),
+  roof:   new THREE.MeshLambertMaterial({map:tex('roof',2.4,1.6)}),
+  roofDark:new THREE.MeshLambertMaterial({map:tex('roof',2.2,1.5), color:0x9a8a76}),
+  wall:   new THREE.MeshLambertMaterial({map:tex('wall',2,1.4), color:0xe6d9ba}),
+  wallWood:new THREE.MeshLambertMaterial({map:tex('wood',2,1.4), color:0xb99f78}),
+  wood:   new THREE.MeshLambertMaterial({map:tex('wood',2,1)}),
+  woodDark:new THREE.MeshLambertMaterial({map:tex('wood',1.6,1), color:0x8a6f4e}),
+  water:  new THREE.MeshLambertMaterial({map:tex('water',7,26), color:0x87a8b5}),
+  stone:  new THREE.MeshLambertMaterial({map:tex('wall',3,1.6), color:0xa79c86}),
+  ink:    new THREE.MeshLambertMaterial({color:0x3a3128}),
+  leaf:   new THREE.MeshLambertMaterial({color:0x55613f}),
+  leaf2:  new THREE.MeshLambertMaterial({color:0x68744c}),
+  trunk:  new THREE.MeshLambertMaterial({color:0x4d3d2a}),
+  red:    new THREE.MeshLambertMaterial({color:0xa33327}),
+  gold:   new THREE.MeshLambertMaterial({color:0xd9a83c, emissive:0x664d10}),
+  lamp:   new THREE.MeshLambertMaterial({color:0xc23a24, emissive:0x7a1608}),
+};
+function box(w,h,d,mat,x,y,z,parent){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+  m.position.set(x,y,z); (parent||scene).add(m); return m; }
+function shadowDisc(r,x,z,y=0.03,parent){ const m=new THREE.Mesh(new THREE.CircleGeometry(r,20),
+  new THREE.MeshBasicMaterial({color:0x2a1c08, transparent:true, opacity:0.20, depthWrite:false}));
+  m.rotation.x=-Math.PI/2; m.position.set(x,y,z); (parent||scene).add(m); return m; }
+
+/* ================= the painting around you ================= */
+{ const bt=loadTex('assets/backdrop.webp', 3, 1, false); bt.wrapS=THREE.RepeatWrapping;
+  const cyl=new THREE.Mesh(new THREE.CylinderGeometry(880,880,340,48,1,true),
+    new THREE.MeshBasicMaterial({map:bt, side:THREE.BackSide, fog:false}));
+  cyl.position.y=120; scene.add(cyl);
+  const sky=new THREE.Mesh(new THREE.SphereGeometry(1500,24,12,0,Math.PI*2,0,Math.PI/2.6),
+    new THREE.MeshBasicMaterial({color:0xf2e2b0, side:THREE.BackSide, fog:false}));
+  sky.position.y=-40; scene.add(sky); }
+
+/* ================= terrain ================= */
+{ // ground in two slabs so the river band stays open water
+  const gW=new THREE.Mesh(new THREE.PlaneGeometry(RIVER.x0+4+760,780), MAT.ground);
+  gW.rotation.x=-Math.PI/2; gW.position.set((-760+RIVER.x0+4)/2,0,0); scene.add(gW);
+  const gE=new THREE.Mesh(new THREE.PlaneGeometry(760-(RIVER.x1-4),780), MAT.ground);
+  gE.rotation.x=-Math.PI/2; gE.position.set((RIVER.x1-4+760)/2,0,0); scene.add(gE);
+  const bed=new THREE.Mesh(new THREE.PlaneGeometry(RIVER.x1-RIVER.x0+40,780),
+    new THREE.MeshLambertMaterial({color:0x51665a}));
+  bed.rotation.x=-Math.PI/2; bed.position.set((RIVER.x0+RIVER.x1)/2,-0.62,0); scene.add(bed);
+  const roadW=new THREE.Mesh(new THREE.PlaneGeometry(RIVER.x0+2+598,17), MAT.road);
+  roadW.rotation.x=-Math.PI/2; roadW.position.set((-598+RIVER.x0+2)/2,0.02,0); scene.add(roadW);
+  const roadE=new THREE.Mesh(new THREE.PlaneGeometry(582-(RIVER.x1-2),17), MAT.road);
+  roadE.rotation.x=-Math.PI/2; roadE.position.set((RIVER.x1-2+582)/2,0.02,0); scene.add(roadE);
+  // countryside fields
+  for (const [fx,fz,fw,fd] of [[-500,-70,120,80],[-430,80,150,70],[-350,-90,110,60],[-520,40,90,50]]){
+    const f=new THREE.Mesh(new THREE.PlaneGeometry(fw,fd), MAT.field);
+    f.rotation.x=-Math.PI/2; f.rotation.z=(fx*7%13)*0.02; f.position.set(fx,0.015,fz); scene.add(f); }
+  // river: water + banks
+  const w=new THREE.Mesh(new THREE.PlaneGeometry(RIVER.x1-RIVER.x0+36,780), MAT.water);
+  w.rotation.x=-Math.PI/2; w.position.set((RIVER.x0+RIVER.x1)/2,-0.35,0); scene.add(w); w.name='water';
+  for (const s of [-1,1]){ const bank=box(10,1.6,780,MAT.ground, (s<0?RIVER.x0-14:RIVER.x1+14), -0.5, 0);
+    bank.rotation.z = s*0.18; }
+}
+
+/* ================= 虹桥 the rainbow bridge ================= */
+{ const N=18, W2=13.6;
+  for (let i=0;i<N;i++){ const t0=i/N, t1=(i+1)/N, tm=(t0+t1)/2;
+    const x=lerp(RIVER.x0,RIVER.x1,tm), h=deckH(x);
+    const slope=Math.atan2(deckH(lerp(RIVER.x0,RIVER.x1,t1))-deckH(lerp(RIVER.x0,RIVER.x1,t0)), (RIVER.x1-RIVER.x0)/N);
+    const seg=box((RIVER.x1-RIVER.x0)/N+0.35, 0.9, W2, MAT.wood, x, h-0.45, 0); seg.rotation.z=-slope;
+    for (const s of [-1,1]){
+      const post=box(0.32,1.5,0.32, MAT.woodDark, x, h+0.55, s*(W2/2-0.4));
+      const rail=box((RIVER.x1-RIVER.x0)/N+0.3, 0.22, 0.22, MAT.woodDark, x, h+1.28, s*(W2/2-0.4));
+      rail.rotation.z=-slope; post.rotation.z=-slope*0.4;
+    }
+  }
+  // arch ribs under the deck (the silhouette)
+  for (let i=0;i<9;i++){ const t=(i+0.5)/9, x=lerp(RIVER.x0,RIVER.x1,t);
+    const h=deckH(x)-1.4-2.6*Math.sin(Math.PI*t);
+    const rib=box(3.2, Math.max(1.2,h+2.5), 1.1, MAT.woodDark, x, h/2-1.4, 5.4);
+    const rib2=rib.clone(); rib2.position.z=-5.4; scene.add(rib2); }
+  // end ramps
+  for (const s of [-1,1]){ const r=box(16,0.8,12.5, MAT.wood, s<0?RIVER.x0-7:RIVER.x1+7, 0.1, 0);
+    r.rotation.z = s*0.045; }
+}
+
+/* ================= buildings ================= */
+function roofSlab(w,d,h,mat){ const g=new THREE.Group();
+  const r=new THREE.Mesh(new THREE.ConeGeometry(1,1,4), mat);
+  r.scale.set(w*0.78, h, d*0.78); r.rotation.y=Math.PI/4; r.position.y=h/2; g.add(r);
+  const ridge=box(w*0.4, h*0.14, 0.5, MAT.woodDark, 0, h*0.9, 0, g); return g; }
+function shop(x,z,w,d,floors,mat,roofMat){
+  const g=new THREE.Group(); const bh=floors*3.1;
+  box(w,bh,d, mat, 0, bh/2, 0, g);
+  const rf=roofSlab(w*1.18, d*1.3, 2.2+floors*0.5, roofMat); rf.position.y=bh; g.add(rf);
+  const awn=box(w*0.8, 0.14, 2.6, MAT.wood, 0, 2.6, (z<0?1:-1)*(d/2+1.1), g); awn.rotation.x=(z<0?-1:1)*0.28;
+  box(w*0.5, 2.2, 0.18, MAT.woodDark, 0, 1.1, (z<0?1:-1)*(d/2+0.05), g); // shopfront
+  g.position.set(x,0,z); scene.add(g); shadowDisc(Math.max(w,d)*0.75, x, z, 0.04);
+  return g; }
+function farmhouse(x,z,s=1){
+  const g=new THREE.Group();
+  box(7*s,2.6*s,5*s, MAT.wallWood, 0,1.3*s,0, g);
+  const rf=roofSlab(8.6*s,6.4*s,2.0*s, MAT.roofDark); rf.position.y=2.6*s; g.add(rf);
+  g.position.set(x,0,z); g.rotation.y=(x*13%7)*0.14-0.4; scene.add(g); shadowDisc(6*s,x,z,0.04); }
+function willow(x,z,s=1){
+  const g=new THREE.Group();
+  const t1=new THREE.Mesh(new THREE.CylinderGeometry(0.32*s,0.55*s,3.4*s,7), MAT.trunk);
+  t1.position.y=1.7*s; t1.rotation.z=0.10; g.add(t1);
+  for (let i=0;i<4;i++){ const f=new THREE.Mesh(new THREE.SphereGeometry((1.5+((i*37)%10)/7)*s, 7, 6), i%2?MAT.leaf:MAT.leaf2);
+    f.scale.y=0.72; f.position.set(Math.sin(i*2.4)*1.3*s, (3.9+ (i%3)*0.5)*s, Math.cos(i*2.4)*1.3*s); g.add(f); }
+  g.position.set(x,0,z); scene.add(g); shadowDisc(2.6*s,x,z,0.04); }
+function stall(x,z){
+  const g=new THREE.Group();
+  box(2.6,0.9,1.4, MAT.wood, 0,0.45,0, g);
+  const um=new THREE.Mesh(new THREE.ConeGeometry(2.0,0.7,8), MAT.roofDark); um.position.y=2.6; g.add(um);
+  box(0.12,2.6,0.12, MAT.woodDark, 0,1.3,0, g);
+  box(1.8,0.3,0.9, MAT.gold, 0,1.05,0, g);
+  g.position.set(x,0,z); g.rotation.y=(x*7%9)*0.2; scene.add(g); }
+function lampPost(x,z){
+  box(0.14,3.4,0.14, MAT.woodDark, x,1.7,z);
+  const l=new THREE.Mesh(new THREE.SphereGeometry(0.34,10,8), MAT.lamp); l.position.set(x,3.35,z); scene.add(l);
+  box(0.8,0.1,0.1, MAT.woodDark, x,3.62,z); }
+
+/* countryside */
+farmhouse(-505,-26); farmhouse(-468,30,1.15); farmhouse(-392,-34,0.9); farmhouse(-338,26);
+for (let i=0;i<10;i++) willow(-545+((i*83)%290), (i%2?1:-1)*(16+((i*41)%38)), 0.9+((i*29)%40)/60);
+for (let i=0;i<6;i++) willow(RIVER.x0-16-((i*31)%22), (i%2?1:-1)*(14+((i*53)%60)), 1.0);
+for (let i=0;i<6;i++) willow(RIVER.x1+14+((i*37)%24), (i%2?1:-1)*(14+((i*47)%60)), 1.0);
+/* market streets: suburbs, main town, inner city */
+let seedB=7; const rndB=()=>{ seedB=(seedB*1103515245+12345)&0x7fffffff; return seedB/0x7fffffff; };
+for (let x=-52;x<308;x+=15.5){ if (rndB()<0.88) shop(x+(rndB()*4-2), -15.5-rndB()*7, 11+rndB()*4, 9+rndB()*3, rndB()<0.4?2:1, rndB()<0.5?MAT.wall:MAT.wallWood, rndB()<0.7?MAT.roof:MAT.roofDark);
+  if (rndB()<0.88) shop(x+(rndB()*4-2), 15.5+rndB()*7, 11+rndB()*4, 9+rndB()*3, rndB()<0.4?2:1, rndB()<0.5?MAT.wall:MAT.wallWood, rndB()<0.7?MAT.roof:MAT.roofDark); }
+for (let x=372;x<532;x+=16){ if (rndB()<0.9) shop(x+(rndB()*4-2), -15.5-rndB()*6, 11+rndB()*4, 9+rndB()*3, rndB()<0.45?2:1, rndB()<0.5?MAT.wall:MAT.wallWood, MAT.roof);
+  if (rndB()<0.9) shop(x+(rndB()*4-2), 15.5+rndB()*6, 11+rndB()*4, 9+rndB()*3, rndB()<0.45?2:1, rndB()<0.5?MAT.wall:MAT.wallWood, MAT.roof); }
+for (let i=0;i<9;i++) stall(-30+i*38+(i%3)*7, (i%2?1:-1)*(8.6+ (i%4)));
+for (let i=0;i<7;i++) willow(-20+i*52, (i%2?1:-1)*(26+(i%3)*9), 0.95);
+lampPost(318,-8); lampPost(318,8); lampPost(344,-8); lampPost(344,8); lampPost(-6,-10); lampPost(120,10);
+
+/* ================= 城门 the city gate ================= */
+{ const g=new THREE.Group();
+  for (const s of [-1,1]){ // wall runs
+    box(8,15,132, MAT.stone, 0, 7.5, s*(9+66), g);
+    box(9.5,1.2,134, MAT.woodDark, 0, 15.6, s*(9+66), g);
+  }
+  box(10,4.5,20, MAT.stone, 0, 17.2, 0, g); // gate platform
+  const tower=new THREE.Group();
+  box(13,4.6,16, MAT.wallWood, 0, 2.3, 0, tower);
+  for (const [cx,cz] of [[-5.6,-6.8],[5.6,-6.8],[-5.6,6.8],[5.6,6.8]])
+    box(0.55,4.6,0.55, MAT.red, cx, 2.3, cz, tower);
+  const r1=roofSlab(16.5,19.5,3.4, MAT.roof); r1.position.y=4.6; tower.add(r1);
+  box(9,2.8,12, MAT.wallWood, 0, 9.3, 0, tower);
+  const r2=roofSlab(12.5,15,2.8, MAT.roof); r2.position.y=10.7; tower.add(r2);
+  tower.position.y=19.4; g.add(tower);
+  const plaque=box(4.6,1.5,0.2, MAT.ink, -5.05, 12.4, 0, g); plaque.rotation.y=0;
+  g.position.set(GATE_X,0,0); scene.add(g); }
+
+/* ================= people ================= */
+const ROBES=[0x5a6a7d,0x74604a,0x59684e,0x7d5a52,0x4e5a6a,0x8a7350,0x655a74];
+const walkers=[];
+function person(x,z,ry=0,robe=null,carry=false){
+  const g=new THREE.Group();
+  const robeMat=new THREE.MeshLambertMaterial({color:robe??ROBES[Math.abs(Math.round(x*3+z))%ROBES.length]});
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.30,0.52,1.42,8), robeMat); body.position.y=0.71; g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.21,10,8), new THREE.MeshLambertMaterial({color:0xd9a066}));
+  head.position.y=1.62; g.add(head);
+  const hat=new THREE.Mesh(new THREE.CylinderGeometry(0.23,0.24,0.14,8), MAT.ink); hat.position.y=1.79; g.add(hat);
+  box(0.30,0.05,0.10, MAT.ink, -0.28,1.86,0, g); box(0.30,0.05,0.10, MAT.ink, 0.28,1.86,0, g);
+  if (carry){ const pole=box(2.2,0.06,0.06, MAT.woodDark, 0,1.52,0, g); pole.rotation.z=0.03;
+    box(0.42,0.42,0.42, MAT.wood, -1.0,1.16,0, g); box(0.42,0.42,0.42, MAT.wood, 1.0,1.16,0, g); }
+  g.position.set(x, groundH(x,z), z); g.rotation.y=ry; scene.add(g); shadowDisc(0.55,x,z, groundH(x,z)+0.04, scene);
+  return g; }
+person(-498,-4,1.2,null,true); person(-495,-2.4,1.4); person(-388,3,-0.6,null,true);
+person(-160,4.6,3.14); person(-152,-4.8,0.4); person(-168,-4.5,2.8); person(-146,4.9,3.4); // on the bridge, watching the river
+person(-30,-6,2.2,null,true); person(18,5,-1.1); person(44,-5.4,0.8,null,true); person(76,6,2.6);
+person(118,-6,1.9); person(150,5.2,-0.4,null,true); person(196,-5,-2.4); person(238,6,1.2);
+person(300,-4,0.4); person(306,4.5,2.9); person(352,3,1.6,null,true); person(430,-5,2.2); person(486,5,-1.0);
+for (let i=0;i<6;i++){ const w=person(-40+i*62, i%2?3.4:-3.4, i%2?-Math.PI/2:Math.PI/2, null, i%3===0);
+  walkers.push({g:w, dir:i%2?1:-1, speed:0.9+((i*37)%40)/60, lane:i%2?3.4:-3.4}); }
+
+/* ================= boats ================= */
+const boats=[];
+function boat(x,z,withMast){
+  const g=new THREE.Group();
+  const hull=box(11,1.5,3.2, MAT.woodDark, 0,0.75,0, g);
+  const bow=box(2.6,1.1,2.6, MAT.woodDark, 6.2,1.25,0, g); bow.rotation.z=-0.35;
+  const stern=box(2.2,1.3,2.8, MAT.woodDark, -6.0,1.35,0, g); stern.rotation.z=0.3;
+  box(5.6,1.7,2.6, MAT.wallWood, -0.6,2.2,0, g);
+  const rf=roofSlab(6.6,3.6,1.1, MAT.roofDark); rf.position.y=3.05; g.add(rf);
+  if (withMast){ box(0.16,7.5,0.16, MAT.woodDark, 2.6,5.2,0, g); }
+  g.position.set(x,-0.3,z); scene.add(g); boats.push({g, speed:2.6+Math.random()*1.4, x});
+  return g; }
+boat(-163,-150,true); boat(-138,120,false); boat(-185,40,false);
+
+/* ================= the rider ================= */
+function buildHorse(){
+  const g=new THREE.Group(); const ink=new THREE.MeshLambertMaterial({color:0x38302a});
+  const ink2=new THREE.MeshLambertMaterial({color:0x2a231c});
+  const body=new THREE.Mesh(new THREE.SphereGeometry(0.62,14,12), ink);
+  body.scale.set(1.65,0.78,0.66); body.position.y=1.12; g.add(body);
+  const chest=new THREE.Mesh(new THREE.SphereGeometry(0.46,12,10), ink); chest.position.set(0.78,1.18,0); g.add(chest);
+  const rump=new THREE.Mesh(new THREE.SphereGeometry(0.47,12,10), ink); rump.position.set(-0.78,1.2,0); g.add(rump);
+  const neck=box(0.85,0.42,0.36, ink, 1.18,1.52,0, g); neck.rotation.z=0.7;
+  const head=box(0.62,0.30,0.30, ink, 1.62,1.86,0, g); head.rotation.z=-0.25;
+  box(0.2,0.16,0.2, ink2, 1.86,1.72,0, g); // muzzle
+  const ear1=box(0.09,0.24,0.09, ink2, 1.42,2.06,0.09, g); ear1.rotation.z=-0.2;
+  const ear2=box(0.09,0.24,0.09, ink2, 1.42,2.06,-0.09, g); ear2.rotation.z=-0.2;
+  box(0.7,0.34,0.08, ink2, 1.02,1.78,0, g).rotation.z=0.7; // mane
+  const tail=box(0.14,0.85,0.14, ink2, -1.28,1.05,0, g); tail.rotation.z=0.35; tail.name='tail';
+  const legs=[];
+  for (const [lx,lz] of [[0.72,0.26],[0.72,-0.26],[-0.72,0.26],[-0.72,-0.26]]){
+    const hip=new THREE.Group(); hip.position.set(lx,0.98,lz); g.add(hip);
+    const up=new THREE.Mesh(new THREE.CylinderGeometry(0.085,0.07,0.55,7), ink); up.position.y=-0.27; hip.add(up);
+    const knee=new THREE.Group(); knee.position.y=-0.55; hip.add(knee);
+    const lo=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.05,0.5,7), ink2); lo.position.y=-0.25; knee.add(lo);
+    legs.push({hip,knee,front:lx>0,side:lz>0?1:-1});
+  }
+  // saddle + rider
+  box(0.55,0.10,0.6, new THREE.MeshLambertMaterial({color:0x7a2e22}), 0.02,1.48,0, g);
+  const rider=new THREE.Group(); rider.position.set(0.02,1.5,0); rider.name='rider'; g.add(rider);
+  const robe=new THREE.Mesh(new THREE.CylinderGeometry(0.30,0.52,0.95,10), MAT.red); robe.position.y=0.48; rider.add(robe);
+  const torso=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.30,0.55,10), MAT.red); torso.position.y=1.15; rider.add(torso);
+  const rhead=new THREE.Mesh(new THREE.SphereGeometry(0.20,12,10), new THREE.MeshLambertMaterial({color:0xd9a066}));
+  rhead.position.y=1.66; rider.add(rhead);
+  const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.21,0.22,0.13,10), MAT.ink); cap.position.y=1.82; rider.add(cap);
+  box(0.34,0.05,0.11, MAT.ink, -0.3,1.9,0, rider); box(0.34,0.05,0.11, MAT.ink, 0.3,1.9,0, rider);
+  const arm=box(0.62,0.11,0.11, MAT.red, 0.3,1.28,0.18, rider); arm.rotation.z=-0.5;
+  scene.add(g);
+  return {g, legs, tail, rider};
+}
+const horse=buildHorse();
+
+/* ================= coins ================= */
+const coinTexC=document.createElement('canvas'); coinTexC.width=coinTexC.height=128;
+{ const c=coinTexC.getContext('2d');
+  c.fillStyle='#d9a83c'; c.beginPath(); c.arc(64,64,62,0,6.29); c.fill();
+  c.strokeStyle='#8a6a1c'; c.lineWidth=7; c.beginPath(); c.arc(64,64,55,0,6.29); c.stroke();
+  c.lineWidth=3; c.beginPath(); c.arc(64,64,40,0,6.29); c.stroke();
+  c.fillStyle='#e9d6a4'; c.fillRect(46,46,36,36); c.strokeStyle='#8a6a1c'; c.lineWidth=4; c.strokeRect(46,46,36,36); }
+const coinTex=new THREE.CanvasTexture(coinTexC);
+const coinMats=[new THREE.MeshLambertMaterial({map:coinTex, emissive:0x554008}),
+  new THREE.MeshLambertMaterial({color:0xb98d2e}), new THREE.MeshLambertMaterial({map:coinTex, emissive:0x554008})];
+const coinGeo=new THREE.CylinderGeometry(0.55,0.55,0.13,22); coinGeo.rotateX(Math.PI/2);
+let coins=[];
+function buildCoins(){
+  for (const c of coins) scene.remove(c.mesh);
+  coins=[];
+  const add=(x,z)=>{ const y=groundH(x,z)+1.35;
+    const m=new THREE.Mesh(coinGeo, coinMats);
+    m.position.set(x,y,z); scene.add(m); coins.push({mesh:m, x, y, z, taken:false, ph:Math.random()*6.28}); };
+  let seedC=99; const rndC=()=>{ seedC=(seedC*1103515245+12345)&0x7fffffff; return seedC/0x7fffffff; };
+  for (let x=-545;x<-258;x+=13) add(x, (rndC()-0.5)*5);
+  for (let x=-238;x<-82;x+=11) add(x, (rndC()-0.5)*3.4);       // over the bridge
+  for (let x=-58;x<318;x+=12.5) add(x, (rndC()-0.5)*7.5);
+  for (let x=346;x<536;x+=12.5) add(x, (rndC()-0.5)*7.5);
+  add(GATE_X-14,0); add(GATE_X+14,0);
+}
+function reviveCoins(){ for (const c of coins){ c.taken=false; c.mesh.visible=true; } }
+
+/* ================= audio (synth, like the 2D version) ================= */
+let AC=null, master=null;
+function audio(){ if(AC) return; AC=new (window.AudioContext||window.webkitAudioContext)();
+  master=AC.createGain(); master.gain.value=0.5; master.connect(AC.destination); }
+function pluck(f,vol=0.2,dur=0.4){ if(!AC||!S.sound) return; const t=AC.currentTime;
+  const o=AC.createOscillator(), o2=AC.createOscillator(), g=AC.createGain();
+  o.type='triangle'; o.frequency.value=f; o2.type='sine'; o2.frequency.value=f*2;
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+0.008);
+  g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+  const g2=AC.createGain(); g2.gain.value=0.35; o.connect(g); o2.connect(g2); g2.connect(g); g.connect(master);
+  o.start(t); o2.start(t); o.stop(t+dur+0.05); o2.stop(t+dur+0.05); }
+const PENTA=[523.25,587.33,659.25,783.99,880.00,1046.5,1174.7,1318.5,1568.0,1760.0];
+
+/* ================= state & input ================= */
+const S={ mode:'gallery', t:0, x:START_X+14, z:0, y:0, heading:0, speed:0, vy:0, air:false, airT:0, phase:0,
+  carried:0, carriedPts:0, bankedCoins:0, score:0, chain:0, chainT:0, dist:0, gateArmed:true, sound:false, startedAt:0 };
+const keys={};
+let orbitYaw=0, orbitPitch=0.10, dragging=false;
+addEventListener('keydown',e=>{ if(S.mode!=='play') return;
+  if(['ArrowLeft','ArrowRight','ArrowDown','ArrowUp','Space'].includes(e.code)) e.preventDefault();
+  keys[e.code]=true;
+  if(e.code==='Space') jump();
+  if(e.code==='KeyM') toggleSound();
+  if(e.code==='Escape') toGallery(); });
+addEventListener('keyup',e=>{ keys[e.code]=false; });
+const cvEl=$('gl');
+cvEl.addEventListener('pointerdown',e=>{ dragging=true; cvEl.setPointerCapture(e.pointerId); });
+addEventListener('pointerup',()=>dragging=false);
+addEventListener('pointermove',e=>{ if(!dragging||S.mode!=='play') return;
+  orbitYaw-=e.movementX*0.0042; orbitPitch=clamp(orbitPitch+e.movementY*0.003, -0.05, 0.62); });
+function bindHold(id,code){ const el=$(id);
+  const on=e=>{ e.preventDefault(); keys[code]=true; if(code==='Space') jump(); };
+  const off=e=>{ e.preventDefault(); keys[code]=false; };
+  el.addEventListener('pointerdown',on); el.addEventListener('pointerup',off);
+  el.addEventListener('pointerleave',off); el.addEventListener('pointercancel',off); }
+bindHold('pad-left','KeyA'); bindHold('pad-right','KeyD'); bindHold('pad-fwd','KeyW'); bindHold('pad-jump','Space');
+function jump(){ if(S.mode!=='play'||S.air) return; S.vy=6.4; S.air=true; S.airT=0; }
+function toggleSound(){ S.sound=!S.sound; if(S.sound) audio();
+  $('btn-sound').textContent=S.sound?'♫':'♪'; $('btn-sound').style.color=S.sound?'#ffd977':''; }
+
+/* ================= flow ================= */
+function startRide(){ audio();
+  Object.assign(S,{mode:'play', x:START_X+14, z:0, y:0, heading:0, speed:0, vy:0, air:false,
+    carried:0, carriedPts:0, bankedCoins:0, score:0, chain:0, dist:0, gateArmed:true, startedAt:performance.now()});
+  orbitYaw=0; orbitPitch=0.10; reviveCoins();
+  $('gallery').classList.add('hidden'); $('finish').classList.add('hidden'); $('board').classList.add('hidden');
+  $('hud').classList.remove('hidden');
+  const b=$('brief'); b.style.opacity=1; setTimeout(()=>b.style.opacity=0,5200); }
+function toGallery(){ S.mode='gallery'; $('hud').classList.add('hidden'); $('finish').classList.add('hidden');
+  $('gallery').classList.remove('hidden'); }
+function finishGame(){ S.mode='over'; $('fin-score').textContent=S.score.toLocaleString();
+  $('fin-stats').textContent=`送达铜钱 ${S.bankedCoins} 枚 · 全程 ${Math.round(S.dist)} 步 · 用时 ${Math.round((performance.now()-S.startedAt)/1000)} 秒`;
+  $('hud').classList.add('hidden'); $('finish').classList.remove('hidden'); }
+$('enter').onclick=startRide;
+$('btn-gallery').onclick=toGallery;
+$('btn-sound').onclick=toggleSound;
+$('finish-btn').onclick=finishGame;
+$('fin-again').onclick=startRide;
+$('fin-back').onclick=toGallery;
+$('board-close').onclick=()=>{ $('board').classList.add('hidden');
+  if(S.mode==='gallery') $('gallery').classList.remove('hidden');
+  else if(S.mode==='over') $('finish').classList.remove('hidden'); };
+$('open-board').onclick=()=>{ renderBoard(); $('board').classList.remove('hidden'); };
+$('fin-form').onsubmit=e=>{ e.preventDefault();
+  const name=($('fin-name').value||'无名骑手').trim().slice(0,10)||'无名骑手';
+  const board=JSON.parse(localStorage.getItem('qm-board')||'[]');
+  board.push({name, score:S.score, coins:S.bankedCoins, at:Date.now()});
+  board.sort((a,b)=>b.score-a.score); localStorage.setItem('qm-board', JSON.stringify(board.slice(0,10)));
+  $('board-msg').textContent='已记入本地榜。'; renderBoard();
+  $('finish').classList.add('hidden'); $('board').classList.remove('hidden'); };
+function renderBoard(){ const board=JSON.parse(localStorage.getItem('qm-board')||'[]');
+  $('board-list').innerHTML=board.map(r=>`<li><span>${r.name}</span><b>${r.score.toLocaleString()}</b></li>`).join('');
+  $('board-empty').style.display=board.length?'none':'block'; }
+
+/* ================= floaters in 3D->2D ================= */
+const floaters=[];
+const floatDiv=document.createElement('div');
+floatDiv.style.cssText='position:fixed;inset:0;z-index:9;pointer-events:none;overflow:hidden;';
+document.body.appendChild(floatDiv);
+function addFloater(x,y,z,txt,big){ const el=document.createElement('div');
+  el.textContent=txt;
+  el.style.cssText=`position:absolute;transform:translate(-50%,-50%);font-weight:${big?700:600};font-size:${big?25:17}px;`+
+    `color:${big?'#b8860b':'#8a6a1c'};text-shadow:0 1px 0 rgba(255,246,214,.9),0 2px 10px rgba(255,246,214,.65);white-space:nowrap;letter-spacing:.08em;`;
+  floatDiv.appendChild(el); floaters.push({x,y,z,el,t:0}); }
+
+/* ================= update ================= */
+const V3=new THREE.Vector3();
+function update(dt){
+  S.t+=dt;
+  // ambient: water, boats, walkers
+  const w=scene.getObjectByName('water'); if(w) w.material.map.offset.y+=dt*0.015;
+  for (const b of boats){ b.g.position.z+=b.speed*dt; b.g.position.y=-0.3+Math.sin(S.t*0.9+b.x)*0.08;
+    b.g.rotation.y=-Math.PI/2;
+    if (b.g.position.z>290) b.g.position.z=-290; }
+  for (const wk of walkers){ wk.g.position.x+=wk.dir*wk.speed*dt;
+    wk.g.position.y=groundH(wk.g.position.x, wk.lane);
+    if (wk.g.position.x>310) wk.dir=-1; if (wk.g.position.x<-58) wk.dir=1;
+    wk.g.rotation.y = wk.dir>0? 0 : Math.PI; }
+  if (S.mode!=='play'){
+    // idle gallery camera: slow drift at the countryside start
+    const cx=START_X+26+Math.sin(S.t*0.1)*4;
+    camera.position.set(cx, 4.4, 13.5); camera.lookAt(START_X+70, 2.2, -6);
+    horse.g.position.set(START_X+16, 0, 2); horse.g.rotation.y=-Math.PI/2+0.2;
+    return; }
+  const fwd=keys.KeyW||keys.ArrowUp, back=keys.KeyS||keys.ArrowDown;
+  const left=keys.KeyA||keys.ArrowLeft, right=keys.KeyD||keys.ArrowRight;
+  const MAXS=13.5;
+  if (fwd) S.speed=Math.min(S.speed+11*dt, MAXS);
+  else if (back) S.speed=Math.max(S.speed-16*dt, -3.2);
+  else S.speed*=Math.exp(-1.1*dt);
+  const turn=(left?1:0)-(right?1:0);
+  S.heading+=turn*1.85*dt*clamp(Math.abs(S.speed)/4.5,0.25,1)*(S.speed<0?-1:1);
+  const nx=S.x+Math.cos(S.heading)*S.speed*dt, nz=S.z-Math.sin(S.heading)*S.speed*dt;
+  S.dist+=Math.hypot(nx-S.x,nz-S.z); S.x=nx; S.z=nz;
+  // world bounds & simple keep-outs
+  S.x=clamp(S.x, START_X+2, END_X);
+  S.z=clamp(S.z, -120, 120);
+  if (Math.abs(S.x-GATE_X)<6.2 && Math.abs(S.z)>8.4 && Math.abs(S.z)<90) S.x = S.x<GATE_X? GATE_X-6.2 : GATE_X+6.2; // gate wall
+  const inWater = S.x>RIVER.x0+3 && S.x<RIVER.x1-3 && Math.abs(S.z)>=8.6;
+  if (inWater) S.speed*=Math.exp(-2.0*dt); // wading drag
+  const gy=inWater? -0.25 : groundH(S.x,S.z);
+  if (!S.air && gy < S.y-1.6){ S.air=true; S.vy=0; S.airT=0; } // rode off the bridge edge
+  if (S.air){ S.vy-=16.5*dt; S.y+=S.vy*dt; S.airT+=dt;
+    if (S.y<=gy){ S.y=gy; S.air=false;
+      if (S.airT>0.45){ const bonus=Math.round(S.airT*45); S.score+=bonus;
+        addFloater(S.x,S.y+3.4,S.z,(S.x>RIVER.x0&&S.x<RIVER.x1?'凌空过桥 +':'跃马 +')+bonus,true);
+        pluck(392,0.15,0.3); }
+      S.airT=0; }
+  } else S.y=gy;
+  S.phase+=Math.abs(S.speed)*dt*1.55;
+  // horse pose
+  horse.g.position.set(S.x,S.y,S.z); horse.g.rotation.y=S.heading;
+  const run=clamp(Math.abs(S.speed)/MAXS,0,1), ph=S.phase;
+  for (const L of horse.legs){ const off=(L.front?0:Math.PI)+(L.side>0?0.18:0);
+    if (S.air){ L.hip.rotation.z= L.front? -0.55 : 0.5; L.knee.rotation.z= L.front? 0.8 : -0.7; }
+    else { L.hip.rotation.z=Math.sin(ph+off)*0.62*run + (run<0.05?(L.front?0.05:-0.05):0);
+           L.knee.rotation.z=Math.max(0,Math.sin(ph+off+1.1))*0.75*run + 0.04; } }
+  horse.g.position.y=S.y + (S.air?0:Math.abs(Math.sin(ph))*0.09*run);
+  horse.g.rotation.z=Math.sin(ph*2)*0.012*run;
+  horse.rider.position.y=1.5+(S.air?0.02:Math.abs(Math.sin(ph+0.6))*0.05*run);
+  horse.tail.rotation.x=Math.sin(S.t*2.4)*0.14;
+  // coins
+  if (S.chainT>0){ S.chainT-=dt; if(S.chainT<=0) S.chain=0; }
+  for (const c of coins){ if(c.taken) continue;
+    c.mesh.rotation.y+=dt*2.2; c.mesh.position.y=c.y+Math.sin(S.t*2.4+c.ph)*0.14;
+    const dx=c.x-S.x, dz=c.z-S.z, dy=c.y-(S.y+1.5);
+    if (dx*dx+dz*dz<5.3 && Math.abs(dy)<2.1){
+      c.taken=true; c.mesh.visible=false; S.chain++; S.chainT=2.2;
+      const m=Math.min(1+0.5*Math.max(0,S.chain-1),6), pts=Math.round(10*m);
+      S.carried++; S.carriedPts+=pts;
+      addFloater(c.x,c.y+1.1,c.z,'+'+pts,false);
+      pluck(PENTA[Math.min(S.chain-1,PENTA.length-1)],0.2,0.38); } }
+  // the gate: deliver only inside the gate passage
+  const inGate=Math.abs(S.x-GATE_X)<5 && Math.abs(S.z)<7.5;
+  if (inGate && S.gateArmed && S.carried>0){
+    S.gateArmed=false; S.score+=S.carriedPts; S.bankedCoins+=S.carried;
+    addFloater(S.x,S.y+4.6,S.z,`送达城门 +${S.carriedPts} 分`,true);
+    [523.25,659.25,783.99,1046.5].forEach((f,i)=>setTimeout(()=>pluck(f,0.2,0.5),i*75));
+    S.carried=0; S.carriedPts=0; reviveCoins(); }
+  if (!inGate) S.gateArmed=true;
+  // camera: follow behind heading + user orbit offset
+  orbitYaw=lerp(orbitYaw,0,1-Math.exp(-0.55*dt));
+  const camA=S.heading+Math.PI+orbitYaw;
+  const cd=10.5, ch=4.3+orbitPitch*7.5;
+  const tx=S.x+Math.cos(camA)*cd*Math.cos(orbitPitch), tz=S.z-Math.sin(camA)*cd*Math.cos(orbitPitch);
+  const ty=S.y+ch;
+  camera.position.x=lerp(camera.position.x||tx, tx, 1-Math.exp(-5.5*dt));
+  camera.position.y=lerp(camera.position.y||ty, ty, 1-Math.exp(-5.5*dt));
+  camera.position.z=lerp(camera.position.z||tz, tz, 1-Math.exp(-5.5*dt));
+  const floorY=groundH(camera.position.x,camera.position.z)+1.1;
+  if (camera.position.y<floorY) camera.position.y=floorY;
+  camera.lookAt(S.x+Math.cos(S.heading)*3.5, S.y+2.0, S.z-Math.sin(S.heading)*3.5);
+  // HUD
+  $('coin-count').textContent=S.carried; $('carry-points').textContent=S.carriedPts;
+  $('bank-count').textContent=S.bankedCoins; $('score').textContent=S.score.toLocaleString();
+  const mult=Math.min(1+0.5*Math.max(0,S.chain-1),6), mc=$('mult-chip');
+  if (S.chain>=2){ mc.classList.remove('hidden'); $('mult').textContent='×'+mult.toFixed(1); } else mc.classList.add('hidden');
+  const dxg=GATE_X-S.x, dzg=0-S.z, distG=Math.hypot(dxg,dzg);
+  $('guide-dist').textContent=distG<9?'已到城门':Math.round(distG*10)+' 步';
+  const bearing=Math.atan2(-(dzg),dxg), rel=bearing-S.heading;
+  $('guide-arrow').style.transform=`rotate(${(-rel*180/Math.PI+360)%360}deg)`;
+  $('strip-you').style.left=(journey(S.x)*100)+'%';
+  const zx=S.x;
+  $('zone').textContent='· '+(zx<-270?'郊野':zx<-245?'汴河岸':zx<-75?'虹 桥':zx<-40?'桥头街市':zx<300?'东京街市':zx<352?'城 门':'城内大街')+' ·';
+  // floaters projection
+  for (let i=floaters.length-1;i>=0;i--){ const f=floaters[i]; f.t+=dt; f.y+=1.5*dt;
+    V3.set(f.x,f.y,f.z).project(camera);
+    if (V3.z>1){ f.el.style.display='none'; } else { f.el.style.display='block';
+      f.el.style.left=((V3.x*0.5+0.5)*innerWidth)+'px'; f.el.style.top=((-V3.y*0.5+0.5)*innerHeight)+'px';
+      f.el.style.opacity=String(1-f.t/1.3); }
+    if (f.t>1.3){ f.el.remove(); floaters.splice(i,1); } }
+}
+
+/* ================= boot & loop ================= */
+buildCoins();
+let last=performance.now();
+function loop(now){ const dt=Math.min((now-last)/1000,0.1); last=now;
+  update(dt); renderer.render(scene,camera); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+function showGalleryOnce(){ $('loading').classList.add('hidden');
+  if (S.mode==='gallery') $('gallery').classList.remove('hidden'); }
+addEventListener('load', showGalleryOnce);
+setTimeout(showGalleryOnce, 3500);
+/* debug: ?x=0.62 starts mid-journey (fraction of START..END) */
+if (new URLSearchParams(location.search).has('x')){
+  const fx=parseFloat(new URLSearchParams(location.search).get('x'));
+  setTimeout(()=>{ startRide(); S.x=START_X+(END_X-START_X)*fx; S.z=0; S.y=groundH(S.x,0);
+    camera.position.set(S.x-10, S.y+4.5, 2); }, 600);
+}
+</script>
+</body>
+</html>
